@@ -4,220 +4,327 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>MLB Draft Slot Tracker (2018-2025)</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" />
 <style>
   :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --panel-2: #1f242d;
-    --border: #2a313c;
-    --text: #e6e8ec;
-    --muted: #8b94a3;
-    --accent: #6aa9ff;
-    --over: #4ade80;
-    --under: #ff6b6b;
-    --neutral: #8b94a3;
+    --sv-black: #0d0d0d;
+    --sv-red: #ff2a22;
+    --sv-red-dark: #c8201a;
+    --sv-gold: #d4a017;
+
+    --bg: #f4f5f7;
+    --bg-lane: #ebedf0;
+    --bg-card: #ffffff;
+
+    --text-primary: #18191b;
+    --text-secondary: #4b5563;
+    --text-tertiary: #6b7280;
+
+    --border-default: #e5e7eb;
+    --border-soft: #f0f1f3;
+
+    --over: #10b981;
+    --over-bg: #ecfdf5;
+    --over-border: #a7f3d0;
+    --under: #ef4444;
+    --under-bg: #fef2f2;
+    --under-border: #fecaca;
+    --neutral: #6b7280;
+    --neutral-bg: #f3f4f6;
+
+    --font-sans: 'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04);
+    --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .04);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-  header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .filter-toggle { display: none; width: 100%; padding: 10px 20px; background: var(--panel-2); border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; text-align: left; cursor: pointer; }
-  .filter-toggle:active { background: var(--panel); }
-  .filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 20px; background: var(--panel-2); border-bottom: 1px solid var(--border); align-items: flex-end; }
-  .filters label { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); gap: 4px; }
-  .filters input[type="text"], .filters select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 6px 8px; border-radius: 4px; font-size: 13px; min-width: 180px; }
-  .filters .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { background: var(--bg); border: 1px solid var(--border); color: var(--muted); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; user-select: none; }
-  .chip.active { color: var(--text); border-color: var(--accent); background: rgba(106,169,255,.1); }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text-primary); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  body { padding-bottom: 60px; }
 
-  /* multi-select */
-  .ms { position: relative; }
-  .ms-button {
-    background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    padding: 6px 24px 6px 8px; border-radius: 4px; font-size: 13px;
-    cursor: pointer; min-width: 130px; text-align: left;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    position: relative;
+  /* topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--sv-black); color: #fff;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px;
   }
-  .ms-button::after {
-    content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-    color: var(--muted); font-size: 11px;
+  .topbar .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 900; letter-spacing: -0.01em; font-size: 17px;
   }
-  .ms-button.has-selection { border-color: var(--accent); color: var(--accent); }
-  .ms-panel {
-    display: none; position: absolute; top: calc(100% + 4px); left: 0;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
-    padding: 6px; z-index: 10; max-height: 280px; overflow-y: auto;
-    min-width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,.5);
-  }
-  .ms.open .ms-panel { display: block; }
-  .ms-actions { display: flex; gap: 6px; padding: 4px 6px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
-  .ms-actions button { background: transparent; color: var(--muted); border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; }
-  .ms-actions button:hover { color: var(--accent); }
-  .ms-option {
-    display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer;
-    font-size: 13px; border-radius: 3px; white-space: nowrap;
-  }
-  .ms-option:hover { background: var(--panel-2); }
-  .ms-option input { margin: 0; cursor: pointer; }
+  .topbar .brand .dot { width: 10px; height: 10px; border-radius: 2px; background: var(--sv-red); }
+  .topbar .brand .sub { font-weight: 500; color: #aab0b8; font-size: 13px; margin-left: 2px; }
 
-  .search-bar { display: flex; align-items: center; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); gap: 10px; }
-  .search-bar .search-input {
-    flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    padding: 10px 12px 10px 36px; border-radius: 6px; font-size: 14px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b94a3' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
-    background-repeat: no-repeat; background-position: 12px center;
+  /* hero / search */
+  .hero { padding: 18px 20px 12px; }
+  .hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+  .hero p { margin: 0 0 14px; color: var(--text-secondary); font-size: 13px; }
+
+  .search-wrap { position: relative; max-width: 560px; }
+  .search-input {
+    width: 100%;
+    background: var(--bg-card); color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    padding: 12px 14px 12px 42px; border-radius: 999px;
+    font-size: 15px; font-family: inherit;
+    box-shadow: var(--shadow-sm);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
+    background-repeat: no-repeat; background-position: 14px center;
   }
-  .search-bar .search-input:focus { outline: none; border-color: var(--accent); }
-  .search-bar .search-input::placeholder { color: var(--muted); }
-  .search-results { position: relative; }
+  .search-input:focus { outline: none; border-color: var(--sv-red); box-shadow: 0 0 0 3px rgba(255,42,34,.12); }
+  .search-input::placeholder { color: var(--text-tertiary); }
+
   .search-suggest {
-    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius);
     max-height: 320px; overflow-y: auto; z-index: 20;
-    box-shadow: 0 4px 14px rgba(0,0,0,.5);
+    box-shadow: var(--shadow);
   }
   .search-suggest.open { display: block; }
-  .suggest-item { padding: 10px 14px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #1c2029; display: flex; justify-content: space-between; gap: 12px; }
+  .suggest-item {
+    padding: 10px 14px; cursor: pointer; font-size: 14px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; gap: 12px;
+  }
   .suggest-item:last-child { border-bottom: none; }
-  .suggest-item:hover, .suggest-item.active { background: var(--panel-2); }
-  .suggest-item .meta-sm { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .suggest-item:hover, .suggest-item.active { background: var(--bg); }
+  .suggest-item .meta-sm { color: var(--text-tertiary); font-size: 12px; white-space: nowrap; }
 
-  .meta { padding: 8px 20px; color: var(--muted); font-size: 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; }
-  .table-wrap { overflow: auto; max-height: calc(100vh - 280px); -webkit-overflow-scrolling: touch; }
-  table { border-collapse: separate; border-spacing: 0; font-size: 13px; font-family: inherit; font-weight: 400; font-variant-numeric: tabular-nums; }
+  /* filter chips row */
+  .quick-row {
+    padding: 0 20px 12px;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .pill {
+    background: var(--bg-card); border: 1px solid var(--border-default);
+    color: var(--text-secondary); padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; cursor: pointer; user-select: none;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .pill:hover { border-color: var(--text-tertiary); }
+  .pill.active { background: var(--sv-black); color: #fff; border-color: var(--sv-black); }
+  .pill.pill-over.active { background: var(--over); border-color: var(--over); }
+  .pill.pill-under.active { background: var(--under); border-color: var(--under); }
+  .pill-divider { width: 1px; height: 20px; background: var(--border-default); margin: 0 4px; }
+  .pill-link { background: transparent; border: none; color: var(--text-tertiary); padding: 7px 8px; font-size: 13px; cursor: pointer; }
+  .pill-link:hover { color: var(--sv-red); }
+
+  /* filter section (collapsible) */
+  .filters-section { padding: 0 20px 16px; }
+  .filters-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
+  }
+  .ms { position: relative; }
+  .ms-button {
+    width: 100%; background: var(--bg-card); color: var(--text-primary);
+    border: 1px solid var(--border-default); padding: 10px 36px 10px 14px;
+    border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+    cursor: pointer; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    position: relative; box-shadow: var(--shadow-sm);
+  }
+  .ms-button::after {
+    content: '▾'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-tertiary); font-size: 11px;
+  }
+  .ms-button.has-selection { border-color: var(--sv-red); color: var(--sv-red); font-weight: 600; }
+  .ms-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; display: block; }
+  .ms-panel {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+    padding: 6px; z-index: 25; max-height: 280px; overflow-y: auto;
+    box-shadow: var(--shadow);
+  }
+  .ms.open .ms-panel { display: block; }
+  .ms-actions { display: flex; gap: 6px; padding: 4px 8px 8px; border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
+  .ms-actions button { background: transparent; color: var(--text-tertiary); border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; font-family: inherit; }
+  .ms-actions button:hover { color: var(--sv-red); }
+  .ms-option {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer;
+    font-size: 14px; border-radius: 4px; white-space: nowrap;
+  }
+  .ms-option:hover { background: var(--bg); }
+  .ms-option input { margin: 0; cursor: pointer; accent-color: var(--sv-red); }
+
+  /* results meta */
+  .results-meta {
+    padding: 8px 20px 12px; color: var(--text-tertiary); font-size: 12px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  .results-meta .count { color: var(--text-primary); font-weight: 600; }
+
+  /* CARDS (mobile/default) */
+  .card-list { padding: 0 14px; display: flex; flex-direction: column; gap: 10px; }
+  .pick-card {
+    background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius);
+    padding: 14px 16px; box-shadow: var(--shadow-sm);
+    display: grid; grid-template-columns: 4px 1fr; gap: 14px;
+    overflow: hidden;
+  }
+  .pick-card .stripe { background: var(--neutral); border-radius: 2px; margin: -14px 0 -14px -16px; }
+  .pick-card.over .stripe { background: var(--over); }
+  .pick-card.under .stripe { background: var(--under); }
+  .pick-card .body { min-width: 0; }
+  .pick-card .row1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pick-card .name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick-card .team-tag { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; text-align: right; white-space: nowrap; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+  .pick-card .meta { color: var(--text-secondary); font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+  .pick-card .meta .sep { color: var(--border-default); }
+  .pick-card .meta .pos { color: var(--text-primary); font-weight: 600; }
+  .pick-card .nums { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .pick-card .num-cell { background: var(--bg); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .pick-card .num-cell .label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .pick-card .num-cell .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -0.01em; }
+  .pick-card .num-cell.diff-over { background: var(--over-bg); border: 1px solid var(--over-border); }
+  .pick-card .num-cell.diff-over .val { color: var(--over); }
+  .pick-card .num-cell.diff-under { background: var(--under-bg); border: 1px solid var(--under-border); }
+  .pick-card .num-cell.diff-under .val { color: var(--under); }
+  .pick-card .num-cell.diff-zero { background: var(--neutral-bg); }
+
+  /* TABLE (desktop) */
+  .table-wrap { display: none; padding: 0 20px; }
+  .table-frame {
+    background: var(--bg-card); border: 1px solid var(--border-default);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm);
+  }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: var(--font-sans); font-size: 13.5px; font-variant-numeric: tabular-nums; }
   thead th {
-    position: sticky; top: 0; background: var(--panel); color: var(--text);
-    text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg-lane); color: var(--text-secondary);
+    text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border-default);
     cursor: pointer; user-select: none; white-space: nowrap;
-    font-size: 13px; font-weight: 600; font-family: inherit;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
   }
-  thead th:hover { background: var(--panel-2); }
-  thead th .arrow { color: var(--accent); margin-left: 4px; font-size: 11px; font-weight: 400; }
+  thead th:hover { background: #dfe2e7; color: var(--text-primary); }
+  thead th .arrow { color: var(--sv-red); margin-left: 4px; font-size: 11px; }
   tbody td {
-    padding: 8px 12px; border-bottom: 1px solid #1c2029; white-space: nowrap;
-    background: var(--bg);
-    font-size: 13px; font-weight: 400; font-family: inherit; color: var(--text);
+    padding: 12px 14px; border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-card); color: var(--text-primary);
+    font-size: 13.5px; font-weight: 500; white-space: nowrap;
   }
-  tbody tr:hover td { background: #1a1e26; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg); }
   td.num { text-align: right; }
-  td.diff-pos { color: var(--over); }
-  td.diff-neg { color: var(--under); }
-  td.diff-zero { color: var(--neutral); }
+  td.player { font-weight: 700; }
+  td.diff-pos { color: var(--over); font-weight: 700; }
+  td.diff-neg { color: var(--under); font-weight: 700; }
+  td.diff-zero { color: var(--text-tertiary); }
 
-  /* frozen left columns: Year, Rd, Pick, Player */
-  th.frozen, td.frozen { position: sticky; z-index: 1; }
-  thead th.frozen { z-index: 3; }
-  .frozen-1 { left: 0;     min-width: 56px;  width: 56px; }
-  .frozen-2 { left: 56px;  min-width: 40px;  width: 40px; }
-  .frozen-3 { left: 96px;  min-width: 56px;  width: 56px; }
-  .frozen-4 { left: 152px; min-width: 160px; width: 160px; box-shadow: 6px 0 6px -4px rgba(0,0,0,.5); }
-  thead th.frozen-4 { box-shadow: 6px 0 6px -4px rgba(0,0,0,.5); }
-  .clear-btn { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-  .clear-btn:hover { color: var(--text); border-color: var(--accent); }
-  .legend { font-size: 11px; color: var(--muted); }
-  .legend .over { color: var(--over); }
-  .legend .under { color: var(--under); }
+  /* legend */
+  .legend { font-size: 12px; color: var(--text-tertiary); display: flex; gap: 14px; }
+  .legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .legend .dot-over { background: var(--over); }
+  .legend .dot-under { background: var(--under); }
+
+  /* show more */
+  .show-more { padding: 12px 20px 24px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
+
+  /* desktop layout */
+  @media (min-width: 900px) {
+    .topbar { padding: 14px 28px; }
+    .hero { padding: 24px 28px 16px; }
+    .hero h1 { font-size: 26px; }
+    .quick-row { padding: 0 28px 14px; }
+    .filters-section { padding: 0 28px 16px; }
+    .results-meta { padding: 8px 28px 12px; }
+    .card-list { display: none; }
+    .table-wrap { display: block; padding: 0 28px 24px; }
+    .show-more { padding: 16px 28px 32px; }
+  }
 
   /* mobile */
-  @media (max-width: 720px) {
-    header { padding: 10px 14px; }
-    header h1 { font-size: 15px; }
-    header .sub { display: none; }
-    .search-bar { padding: 8px 12px; }
-    .filter-toggle { display: block; padding: 10px 14px; }
-    .filters { display: none; padding: 10px 14px; gap: 8px; }
-    .filters.open { display: flex; flex-direction: column; align-items: stretch; }
-    .filters label { width: 100%; font-size: 12px; }
-    .filters input[type="text"], .filters select { min-width: 0; width: 100%; padding: 10px; font-size: 14px; }
-    .filters .chips { width: 100%; }
-    .chip { flex: 1; text-align: center; padding: 10px 8px; }
-    .ms-button { width: 100%; min-width: 0; padding: 10px 28px 10px 10px; font-size: 14px; }
-    .ms-panel { left: 0; right: 0; min-width: 0; }
-    .clear-btn { width: 100%; padding: 10px; font-size: 13px; }
-    .meta { padding: 6px 14px; flex-direction: column; gap: 4px; }
-    .table-wrap { max-height: calc(100vh - 200px); }
-    .table-wrap.filters-open { max-height: calc(100vh - 520px); }
-    thead th { padding: 8px 10px; font-size: 12px; }
-    tbody td { padding: 8px 10px; font-size: 12px; }
-    .frozen-4 { min-width: 140px; width: 140px; }
+  @media (max-width: 899px) {
+    .filters-section { display: none; }
+    .filters-section.open { display: block; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>MLB Draft Slot Tracker (2018-2025)</h1>
-  <div class="sub">Over/under-slot bonuses by pick. R1-10 slots from MLB Stats API; R11+ uses year's pool threshold ($125K 2018-22, $150K 2023-25).</div>
-</header>
 
-<div class="search-bar">
-  <div class="search-results" style="flex:1; position:relative;">
+<div class="topbar">
+  <div class="brand"><span class="dot"></span>SV Draft Slots <span class="sub">2018–2025</span></div>
+</div>
+
+<div class="hero">
+  <h1>Over and under slot, by pick</h1>
+  <p>R1-10 slots from MLB Stats API; R11+ uses each year's bonus-pool threshold ($125K through 2022, $150K from 2023 on).</p>
+  <div class="search-wrap">
     <input id="f-search" class="search-input" type="search" autocomplete="off"
-           placeholder="Search players or schools — e.g. Skenes, Holliday, LSU" />
+           placeholder="Search a player or school" />
     <div id="suggest" class="search-suggest"></div>
   </div>
 </div>
 
-<button class="filter-toggle" id="filter-toggle" type="button">Filters ▾</button>
+<div class="quick-row" id="quick-row">
+  <div class="pill pill-over" data-slot-filter="over">Over slot</div>
+  <div class="pill pill-under" data-slot-filter="under">Under slot</div>
+  <div class="pill" data-slot-filter="signed">Signed only</div>
+  <div class="pill-divider"></div>
+  <button class="pill" id="toggle-filters" type="button">Filters ▾</button>
+  <button class="pill-link" id="clear">Clear all</button>
+</div>
 
-<div class="filters" id="filter-bar">
-  <!-- multi-selects mounted by JS -->
-  <label style="display:none">hidden anchor
-    <input id="f-text" type="hidden" />
-  </label>
-  <div class="chips">
-    <div class="chip" data-slot-filter="over">Over-slot</div>
-    <div class="chip" data-slot-filter="under">Under-slot</div>
-    <div class="chip" data-slot-filter="signed">Signed only</div>
+<div class="filters-section" id="filters-section">
+  <div class="filters-grid" id="filters-grid"></div>
+</div>
+
+<div class="results-meta">
+  <div><span class="count" id="row-count">0</span> picks shown</div>
+  <div class="legend">
+    <span><span class="dot dot-over"></span>over slot</span>
+    <span><span class="dot dot-under"></span>under slot</span>
   </div>
-  <button class="clear-btn" id="clear">Clear all</button>
 </div>
 
-<div class="meta">
-  <div><span id="row-count">0</span> picks shown</div>
-  <div class="legend"><span class="over">over-slot (+)</span> &nbsp;|&nbsp; <span class="under">under-slot (&minus;)</span></div>
-</div>
+<!-- mobile: card list -->
+<div class="card-list" id="card-list"></div>
 
+<!-- desktop: table -->
 <div class="table-wrap">
-  <table id="grid">
-    <thead><tr></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div class="table-frame">
+    <table id="grid">
+      <thead><tr></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
 </div>
+
+<div class="show-more" id="show-more"></div>
 
 <script>
 const COLS = [
-  { key: 'year',         label: 'Year',       type: 'num' },
-  { key: 'draftRound',   label: 'Rd',         type: 'num' },
-  { key: 'overall',      label: 'Pick',       type: 'num' },
-  { key: 'fullName',     label: 'Player',     type: 'str' },
-  { key: 'bonus_num',    label: 'Bonus',      type: 'num', fmt: 'money' },
-  { key: 'slot_num',     label: 'Slot',       type: 'num', fmt: 'money' },
-  { key: 'diff_num',     label: 'Diff',       type: 'num', fmt: 'money', diff: true },
-  { key: 'pos_primary',  label: 'Pos1',       type: 'str' },
-  { key: 'pos_secondary',label: 'Pos2',       type: 'str' },
-  { key: 'teamname',     label: 'Team',       type: 'str' },
-  { key: 'College or HS',label: 'C/HS',       type: 'str' },
-  { key: 'colleges3',    label: 'School',     type: 'str' },
+  { key: 'year',         label: 'Year',   type: 'num' },
+  { key: 'draftRound',   label: 'Rd',     type: 'num' },
+  { key: 'overall',      label: 'Pick',   type: 'num' },
+  { key: 'fullName',     label: 'Player', type: 'str', cls: 'player' },
+  { key: 'bonus_num',    label: 'Bonus',  type: 'num', fmt: 'money' },
+  { key: 'slot_num',     label: 'Slot',   type: 'num', fmt: 'money' },
+  { key: 'diff_num',     label: 'Diff',   type: 'num', fmt: 'money', diff: true },
+  { key: 'pos_primary',  label: 'Pos',    type: 'str' },
+  { key: 'pos_secondary',label: 'Pos 2',  type: 'str' },
+  { key: 'teamname',     label: 'Team',   type: 'str' },
+  { key: 'College or HS',label: 'C/HS',   type: 'str' },
+  { key: 'colleges3',    label: 'School', type: 'str' },
 ];
 
-// Multi-select filters: key -> { label, source(d)->value, numeric? }
 const MS_FILTERS = [
   { id: 'year',  label: 'Year',  source: d => d.year,          numeric: true,  desc: true },
   { id: 'team',  label: 'Team',  source: d => d.teamname,      numeric: false },
   { id: 'round', label: 'Round', source: d => d.draftRound,    numeric: true },
-  { id: 'pos1',  label: 'Pos (Primary)',   source: d => d.pos_primary },
-  { id: 'pos2',  label: 'Pos (Secondary)', source: d => d.pos_secondary || '(none)' },
-  { id: 'coll',  label: 'College / HS',    source: d => d['College or HS'] },
+  { id: 'pos1',  label: 'Position',         source: d => d.pos_primary },
+  { id: 'pos2',  label: 'Secondary Pos',    source: d => d.pos_secondary || '(none)' },
+  { id: 'coll',  label: 'College / HS',     source: d => d['College or HS'] },
 ];
 
 let DATA = [];
 let view = [];
-let sortKey = 'overall';
-let sortDir = 1;
+let sortKey = 'year';
+let sortDir = -1;
 let slotFilters = new Set();
-const msState = {}; // id -> Set of selected values
+const msState = {};
+const CAP = 200; // cards per page
+let renderedCount = CAP;
 
 function parseCSV(text) {
   const rows = [];
@@ -253,10 +360,19 @@ function parseMoney(s) {
   return isNaN(n) ? null : n;
 }
 
-function fmtMoney(n) {
-  if (n == null || isNaN(n)) return '';
-  const sign = n < 0 ? '-' : '';
+function fmtMoneyFull(n) {
+  if (n == null || isNaN(n)) return '—';
+  const sign = n < 0 ? '−' : '';
   return sign + '$' + Math.abs(n).toLocaleString('en-US');
+}
+
+function fmtMoneyShort(n) {
+  if (n == null || isNaN(n)) return '—';
+  const sign = n < 0 ? '−' : '';
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return sign + '$' + (a / 1_000_000).toFixed(a >= 10_000_000 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
+  if (a >= 1_000) return sign + '$' + Math.round(a / 1_000) + 'K';
+  return sign + '$' + a;
 }
 
 function splitPos(raw) {
@@ -270,14 +386,13 @@ function uniq(arr) { return [...new Set(arr)].filter(x => x != null && x !== '')
 function buildHeader() {
   const tr = document.querySelector('thead tr');
   tr.innerHTML = '';
-  COLS.forEach((c, i) => {
+  COLS.forEach(c => {
     const th = document.createElement('th');
     th.textContent = c.label;
     th.dataset.key = c.key;
-    if (i < 4) th.classList.add('frozen', 'frozen-' + (i + 1));
     th.addEventListener('click', () => {
       if (sortKey === c.key) sortDir = -sortDir;
-      else { sortKey = c.key; sortDir = 1; }
+      else { sortKey = c.key; sortDir = c.type === 'num' ? -1 : 1; }
       render();
     });
     tr.appendChild(th);
@@ -285,8 +400,7 @@ function buildHeader() {
 }
 
 function buildMultiSelects() {
-  const bar = document.getElementById('filter-bar');
-  const anchor = document.getElementById('f-text').parentElement; // mount before this
+  const grid = document.getElementById('filters-grid');
   for (const f of MS_FILTERS) {
     msState[f.id] = new Set();
     const values = uniq(DATA.map(f.source));
@@ -298,9 +412,11 @@ function buildMultiSelects() {
       return String(a).localeCompare(String(b));
     });
 
-    const wrap = document.createElement('label');
-    wrap.textContent = f.label;
-    wrap.style.position = 'relative';
+    const wrap = document.createElement('div');
+    const lbl = document.createElement('span');
+    lbl.className = 'ms-label';
+    lbl.textContent = f.label;
+    wrap.appendChild(lbl);
 
     const ms = document.createElement('div');
     ms.className = 'ms';
@@ -353,10 +469,9 @@ function buildMultiSelects() {
     ms.appendChild(btn);
     ms.appendChild(panel);
     wrap.appendChild(ms);
-    bar.insertBefore(wrap, anchor);
+    grid.appendChild(wrap);
   }
 
-  // close panels on outside click
   document.addEventListener('click', (e) => {
     document.querySelectorAll('.ms.open').forEach(ms => {
       if (!ms.contains(e.target)) ms.classList.remove('open');
@@ -372,13 +487,11 @@ function syncMS(id) {
   if (sel.size === 0) { btn.textContent = 'All'; btn.classList.remove('has-selection'); }
   else if (sel.size <= 2) { btn.textContent = [...sel].join(', '); btn.classList.add('has-selection'); }
   else { btn.textContent = `${sel.size} selected`; btn.classList.add('has-selection'); }
-  // sync checkboxes
   ms.querySelectorAll('.ms-option input').forEach(cb => { cb.checked = sel.has(cb.value); });
 }
 
 function applyFilters() {
   const text = document.getElementById('f-search').value.toLowerCase().trim();
-
   view = DATA.filter(d => {
     for (const f of MS_FILTERS) {
       const sel = msState[f.id];
@@ -398,11 +511,147 @@ function applyFilters() {
   });
 }
 
+function sortView() {
+  const col = COLS.find(c => c.key === sortKey);
+  view.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (col && col.type === 'num') {
+      av = av == null || av === '' ? -Infinity : +av;
+      bv = bv == null || bv === '' ? -Infinity : +bv;
+      if (isNaN(av)) av = -Infinity;
+      if (isNaN(bv)) bv = -Infinity;
+      return (av - bv) * sortDir;
+    }
+    return String(av || '').localeCompare(String(bv || '')) * sortDir;
+  });
+}
+
+function diffClass(n) {
+  if (n == null) return '';
+  if (n > 0) return 'over';
+  if (n < 0) return 'under';
+  return 'zero';
+}
+
+function renderCards(rows) {
+  const list = document.getElementById('card-list');
+  list.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const d of rows) {
+    const card = document.createElement('div');
+    const dc = diffClass(d.diff_num);
+    card.className = 'pick-card ' + dc;
+    card.innerHTML = `
+      <div class="stripe"></div>
+      <div class="body">
+        <div class="row1">
+          <div class="name">${escapeHtml(d.fullName)}</div>
+          <div class="team-tag">${escapeHtml(d.teamname || '')}</div>
+        </div>
+        <div class="meta">
+          <span class="pos">${escapeHtml(d.pos_primary || '—')}${d.pos_secondary ? ' / ' + escapeHtml(d.pos_secondary) : ''}</span>
+          <span class="sep">·</span>
+          <span>${escapeHtml(d.year)} · R${escapeHtml(d.draftRound)} · #${escapeHtml(d.overall)}</span>
+          <span class="sep">·</span>
+          <span>${escapeHtml(d.colleges3 || d.hsName || '—')}</span>
+        </div>
+        <div class="nums">
+          <div class="num-cell">
+            <div class="label">Bonus</div>
+            <div class="val">${fmtMoneyShort(d.bonus_num)}</div>
+          </div>
+          <div class="num-cell">
+            <div class="label">Slot</div>
+            <div class="val">${fmtMoneyShort(d.slot_num)}</div>
+          </div>
+          <div class="num-cell diff-${dc || 'zero'}">
+            <div class="label">${dc === 'over' ? 'Over' : dc === 'under' ? 'Under' : 'Diff'}</div>
+            <div class="val">${fmtMoneyShort(d.diff_num)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    frag.appendChild(card);
+  }
+  list.appendChild(frag);
+}
+
+function renderTable(rows) {
+  const tbody = document.querySelector('tbody');
+  const frag = document.createDocumentFragment();
+  for (const d of rows) {
+    const tr = document.createElement('tr');
+    for (const c of COLS) {
+      const td = document.createElement('td');
+      let val = d[c.key];
+      if (c.fmt === 'money') {
+        const n = c.key === 'diff_num' ? d.diff_num : (c.key === 'bonus_num' ? d.bonus_num : d.slot_num);
+        td.textContent = n == null ? '' : fmtMoneyFull(n);
+        td.classList.add('num');
+        if (c.diff && n != null) {
+          if (n > 0) td.classList.add('diff-pos');
+          else if (n < 0) td.classList.add('diff-neg');
+          else td.classList.add('diff-zero');
+        }
+      } else if (c.type === 'num') {
+        td.textContent = val == null ? '' : val;
+        td.classList.add('num');
+      } else {
+        td.textContent = val == null ? '' : val;
+      }
+      if (c.cls) td.classList.add(c.cls);
+      tr.appendChild(td);
+    }
+    frag.appendChild(tr);
+  }
+  tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+
+function render() {
+  applyFilters();
+  sortView();
+
+  document.querySelectorAll('thead th').forEach(th => {
+    const k = th.dataset.key;
+    const base = COLS.find(c => c.key === k).label;
+    th.innerHTML = base + (k === sortKey ? ` <span class="arrow">${sortDir > 0 ? '▲' : '▼'}</span>` : '');
+  });
+
+  document.getElementById('row-count').textContent = view.length.toLocaleString();
+
+  renderedCount = CAP;
+  const slice = view.slice(0, renderedCount);
+  renderCards(slice);
+  renderTable(slice);
+
+  const sm = document.getElementById('show-more');
+  if (view.length > renderedCount) {
+    sm.innerHTML = `<button class="pill" id="load-more" type="button">Show more (${(view.length - renderedCount).toLocaleString()} remaining)</button>`;
+    document.getElementById('load-more').addEventListener('click', loadMore);
+  } else {
+    sm.textContent = view.length === 0 ? 'No picks match these filters.' : '';
+  }
+}
+
+function loadMore() {
+  renderedCount = Math.min(renderedCount + CAP, view.length);
+  const slice = view.slice(0, renderedCount);
+  renderCards(slice);
+  renderTable(slice);
+  const sm = document.getElementById('show-more');
+  if (view.length > renderedCount) {
+    sm.innerHTML = `<button class="pill" id="load-more" type="button">Show more (${(view.length - renderedCount).toLocaleString()} remaining)</button>`;
+    document.getElementById('load-more').addEventListener('click', loadMore);
+  } else {
+    sm.textContent = '';
+  }
+}
+
 function renderSuggestions() {
   const q = document.getElementById('f-search').value.toLowerCase().trim();
   const box = document.getElementById('suggest');
   if (q.length < 2) { box.classList.remove('open'); box.innerHTML = ''; return; }
-  // Rank matches: startsWith name > contains name > contains school
   const scored = [];
   for (const d of DATA) {
     const name = (d.fullName || '').toLowerCase();
@@ -422,7 +671,7 @@ function renderSuggestions() {
     const item = document.createElement('div');
     item.className = 'suggest-item' + (i === 0 ? ' active' : '');
     const left = document.createElement('div');
-    left.innerHTML = `<div>${escapeHtml(row.d.fullName)}</div><div class="meta-sm">${escapeHtml(row.d.colleges3 || row.d.hsName || '')} &middot; ${escapeHtml(row.d.posit || '')}</div>`;
+    left.innerHTML = `<div style="font-weight:600">${escapeHtml(row.d.fullName)}</div><div class="meta-sm">${escapeHtml(row.d.colleges3 || row.d.hsName || '')} · ${escapeHtml(row.d.posit || '')}</div>`;
     const right = document.createElement('div');
     right.className = 'meta-sm';
     right.textContent = `${row.d.year} · #${row.d.overall}`;
@@ -441,78 +690,6 @@ function renderSuggestions() {
 
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
-function sortView() {
-  const col = COLS.find(c => c.key === sortKey);
-  view.sort((a, b) => {
-    let av = a[sortKey], bv = b[sortKey];
-    if (col && col.type === 'num') {
-      av = av == null || av === '' ? -Infinity : +av;
-      bv = bv == null || bv === '' ? -Infinity : +bv;
-      if (isNaN(av)) av = -Infinity;
-      if (isNaN(bv)) bv = -Infinity;
-      return (av - bv) * sortDir;
-    }
-    return String(av || '').localeCompare(String(bv || '')) * sortDir;
-  });
-}
-
-function render() {
-  applyFilters();
-  sortView();
-
-  document.querySelectorAll('thead th').forEach(th => {
-    const k = th.dataset.key;
-    const base = COLS.find(c => c.key === k).label;
-    th.innerHTML = base + (k === sortKey ? ` <span class="arrow">${sortDir > 0 ? '▲' : '▼'}</span>` : '');
-  });
-
-  document.getElementById('row-count').textContent = view.length.toLocaleString();
-
-  const tbody = document.querySelector('tbody');
-  const CAP = 1500;
-  const slice = view.slice(0, CAP);
-  const frag = document.createDocumentFragment();
-  for (const d of slice) {
-    const tr = document.createElement('tr');
-    COLS.forEach((c, i) => {
-      const td = document.createElement('td');
-      let val = d[c.key];
-      if (c.fmt === 'money') {
-        const n = c.key === 'diff_num' ? d.diff_num : (c.key === 'bonus_num' ? d.bonus_num : d.slot_num);
-        td.textContent = n == null ? '' : fmtMoney(n);
-        td.classList.add('num');
-        if (c.diff && n != null) {
-          if (n > 0) td.classList.add('diff-pos');
-          else if (n < 0) td.classList.add('diff-neg');
-          else td.classList.add('diff-zero');
-        }
-      } else if (c.type === 'num') {
-        td.textContent = val == null ? '' : val;
-        td.classList.add('num');
-      } else {
-        td.textContent = val == null ? '' : val;
-      }
-      if (i < 4) td.classList.add('frozen', 'frozen-' + (i + 1));
-      tr.appendChild(td);
-    });
-    frag.appendChild(tr);
-  }
-  tbody.innerHTML = '';
-  tbody.appendChild(frag);
-
-  if (view.length > CAP) {
-    const note = document.createElement('tr');
-    const td = document.createElement('td');
-    td.colSpan = COLS.length;
-    td.style.textAlign = 'center';
-    td.style.color = 'var(--muted)';
-    td.style.padding = '12px';
-    td.textContent = `Showing first ${CAP.toLocaleString()} of ${view.length.toLocaleString()} matching picks. Add more filters to narrow.`;
-    note.appendChild(td);
-    tbody.appendChild(note);
-  }
 }
 
 async function init() {
@@ -547,37 +724,36 @@ async function init() {
     else if (e.key === 'Escape') { box.classList.remove('open'); }
   });
 
-  const ft = document.getElementById('filter-toggle');
-  ft.addEventListener('click', () => {
-    const bar = document.getElementById('filter-bar');
-    bar.classList.toggle('open');
-    document.querySelector('.table-wrap').classList.toggle('filters-open', bar.classList.contains('open'));
-    ft.textContent = bar.classList.contains('open') ? 'Filters ▴' : 'Filters ▾';
+  document.getElementById('toggle-filters').addEventListener('click', () => {
+    const sec = document.getElementById('filters-section');
+    sec.classList.toggle('open');
+    const btn = document.getElementById('toggle-filters');
+    btn.textContent = sec.classList.contains('open') ? 'Filters ▴' : 'Filters ▾';
   });
 
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const k = chip.dataset.slotFilter;
+  document.querySelectorAll('.quick-row .pill[data-slot-filter]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const k = pill.dataset.slotFilter;
       if (k === 'over' || k === 'under') {
         const other = k === 'over' ? 'under' : 'over';
         slotFilters.delete(other);
-        document.querySelector(`.chip[data-slot-filter="${other}"]`).classList.remove('active');
+        document.querySelector(`.pill[data-slot-filter="${other}"]`).classList.remove('active');
       }
-      if (slotFilters.has(k)) { slotFilters.delete(k); chip.classList.remove('active'); }
-      else { slotFilters.add(k); chip.classList.add('active'); }
+      if (slotFilters.has(k)) { slotFilters.delete(k); pill.classList.remove('active'); }
+      else { slotFilters.add(k); pill.classList.add('active'); }
       render();
     });
   });
+
   document.getElementById('clear').addEventListener('click', () => {
     Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
     document.getElementById('f-search').value = '';
     slotFilters.clear();
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.pill[data-slot-filter]').forEach(p => p.classList.remove('active'));
     document.getElementById('suggest').classList.remove('open');
     render();
   });
 
-  sortKey = 'year'; sortDir = -1;
   render();
 }
 
