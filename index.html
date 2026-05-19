@@ -13,8 +13,8 @@
     --text: #e6e8ec;
     --muted: #8b94a3;
     --accent: #6aa9ff;
-    --over: #ff6b6b;
-    --under: #4ade80;
+    --over: #4ade80;
+    --under: #ff6b6b;
     --neutral: #8b94a3;
   }
   * { box-sizing: border-box; }
@@ -22,15 +22,46 @@
   header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
   header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   header .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 20px; background: var(--panel-2); border-bottom: 1px solid var(--border); align-items: center; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 20px; background: var(--panel-2); border-bottom: 1px solid var(--border); align-items: flex-end; }
   .filters label { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); gap: 4px; }
-  .filters input, .filters select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 6px 8px; border-radius: 4px; font-size: 13px; min-width: 110px; }
-  .filters input[type="text"] { min-width: 180px; }
+  .filters input[type="text"], .filters select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 6px 8px; border-radius: 4px; font-size: 13px; min-width: 180px; }
   .filters .chips { display: flex; gap: 6px; }
   .chip { background: var(--bg); border: 1px solid var(--border); color: var(--muted); padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; user-select: none; }
   .chip.active { color: var(--text); border-color: var(--accent); background: rgba(106,169,255,.1); }
+
+  /* multi-select */
+  .ms { position: relative; }
+  .ms-button {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 24px 6px 8px; border-radius: 4px; font-size: 13px;
+    cursor: pointer; min-width: 130px; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    position: relative;
+  }
+  .ms-button::after {
+    content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 11px;
+  }
+  .ms-button.has-selection { border-color: var(--accent); color: var(--accent); }
+  .ms-panel {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px; z-index: 10; max-height: 280px; overflow-y: auto;
+    min-width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  }
+  .ms.open .ms-panel { display: block; }
+  .ms-actions { display: flex; gap: 6px; padding: 4px 6px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .ms-actions button { background: transparent; color: var(--muted); border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; }
+  .ms-actions button:hover { color: var(--accent); }
+  .ms-option {
+    display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer;
+    font-size: 13px; border-radius: 3px; white-space: nowrap;
+  }
+  .ms-option:hover { background: var(--panel-2); }
+  .ms-option input { margin: 0; cursor: pointer; }
+
   .meta { padding: 8px 20px; color: var(--muted); font-size: 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
-  .table-wrap { overflow: auto; max-height: calc(100vh - 200px); }
+  .table-wrap { overflow: auto; max-height: calc(100vh - 220px); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th { position: sticky; top: 0; background: var(--panel); color: var(--text); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
   thead th:hover { background: var(--panel-2); }
@@ -54,31 +85,17 @@
   <div class="sub">Over/under-slot bonuses by pick. R1-10 slots from MLB Stats API; R11+ uses year's pool threshold ($125K 2018-22, $150K 2023-25).</div>
 </header>
 
-<div class="filters">
-  <label>Year
-    <select id="f-year"><option value="">All</option></select>
-  </label>
-  <label>Team
-    <select id="f-team"><option value="">All</option></select>
-  </label>
-  <label>Round
-    <select id="f-round"><option value="">All</option></select>
-  </label>
-  <label>Position
-    <select id="f-pos"><option value="">All</option></select>
-  </label>
-  <label>College/HS
-    <select id="f-coll"><option value="">All</option></select>
-  </label>
+<div class="filters" id="filter-bar">
+  <!-- multi-selects mounted by JS -->
   <label>Name / School
     <input id="f-text" type="text" placeholder="search..." />
   </label>
-  <div class="chips" style="align-self: flex-end;">
+  <div class="chips">
     <div class="chip" data-slot-filter="over">Over-slot</div>
     <div class="chip" data-slot-filter="under">Under-slot</div>
     <div class="chip" data-slot-filter="signed">Signed only</div>
   </div>
-  <button class="clear-btn" id="clear">Clear</button>
+  <button class="clear-btn" id="clear">Clear all</button>
 </div>
 
 <div class="meta">
@@ -95,17 +112,28 @@
 
 <script>
 const COLS = [
-  { key: 'year',        label: 'Year',     type: 'num' },
-  { key: 'draftRound',  label: 'Rd',       type: 'num' },
-  { key: 'overall',     label: 'Pick',     type: 'num' },
-  { key: 'fullName',    label: 'Player',   type: 'str' },
-  { key: 'posit',       label: 'Pos',      type: 'str' },
-  { key: 'teamname',    label: 'Team',     type: 'str' },
-  { key: 'College or HS', label: 'C/HS',   type: 'str' },
-  { key: 'colleges3',   label: 'School',   type: 'str' },
-  { key: 'bonus_num',   label: 'Bonus',    type: 'num', fmt: 'money' },
-  { key: 'slot_num',    label: 'Slot',     type: 'num', fmt: 'money' },
-  { key: 'diff_num',    label: 'Diff',     type: 'num', fmt: 'money', diff: true },
+  { key: 'year',         label: 'Year',       type: 'num' },
+  { key: 'draftRound',   label: 'Rd',         type: 'num' },
+  { key: 'overall',      label: 'Pick',       type: 'num' },
+  { key: 'fullName',     label: 'Player',     type: 'str' },
+  { key: 'pos_primary',  label: 'Pos1',       type: 'str' },
+  { key: 'pos_secondary',label: 'Pos2',       type: 'str' },
+  { key: 'teamname',     label: 'Team',       type: 'str' },
+  { key: 'College or HS',label: 'C/HS',       type: 'str' },
+  { key: 'colleges3',    label: 'School',     type: 'str' },
+  { key: 'bonus_num',    label: 'Bonus',      type: 'num', fmt: 'money' },
+  { key: 'slot_num',     label: 'Slot',       type: 'num', fmt: 'money' },
+  { key: 'diff_num',     label: 'Diff',       type: 'num', fmt: 'money', diff: true },
+];
+
+// Multi-select filters: key -> { label, source(d)->value, numeric? }
+const MS_FILTERS = [
+  { id: 'year',  label: 'Year',  source: d => d.year,          numeric: true,  desc: true },
+  { id: 'team',  label: 'Team',  source: d => d.teamname,      numeric: false },
+  { id: 'round', label: 'Round', source: d => d.draftRound,    numeric: true },
+  { id: 'pos1',  label: 'Pos (Primary)',   source: d => d.pos_primary },
+  { id: 'pos2',  label: 'Pos (Secondary)', source: d => d.pos_secondary || '(none)' },
+  { id: 'coll',  label: 'College / HS',    source: d => d['College or HS'] },
 ];
 
 let DATA = [];
@@ -113,9 +141,9 @@ let view = [];
 let sortKey = 'overall';
 let sortDir = 1;
 let slotFilters = new Set();
+const msState = {}; // id -> Set of selected values
 
 function parseCSV(text) {
-  // Minimal CSV parser supporting quoted fields
   const rows = [];
   let row = [], field = '', inQuotes = false;
   for (let i = 0; i < text.length; i++) {
@@ -155,6 +183,12 @@ function fmtMoney(n) {
   return sign + '$' + Math.abs(n).toLocaleString('en-US');
 }
 
+function splitPos(raw) {
+  if (!raw) return { primary: '', secondary: '' };
+  const parts = String(raw).toUpperCase().split('-').map(s => s.trim()).filter(Boolean);
+  return { primary: parts[0] || '', secondary: parts[1] || '' };
+}
+
 function uniq(arr) { return [...new Set(arr)].filter(x => x != null && x !== ''); }
 
 function buildHeader() {
@@ -166,54 +200,116 @@ function buildHeader() {
     th.dataset.key = c.key;
     th.addEventListener('click', () => {
       if (sortKey === c.key) sortDir = -sortDir;
-      else { sortKey = c.key; sortDir = c.type === 'num' ? 1 : 1; }
+      else { sortKey = c.key; sortDir = 1; }
       render();
     });
     tr.appendChild(th);
   });
 }
 
-function buildFilters() {
-  const years = uniq(DATA.map(d => d.year)).sort((a,b) => +b - +a);
-  const teams = uniq(DATA.map(d => d.teamname)).sort();
-  const rounds = uniq(DATA.map(d => d.draftRound)).sort((a,b) => {
-    const an = +a, bn = +b;
-    if (isNaN(an) || isNaN(bn)) return String(a).localeCompare(String(b));
-    return an - bn;
-  });
-  const positions = uniq(DATA.map(d => d.posit)).sort();
-  const colls = uniq(DATA.map(d => d['College or HS'])).sort();
+function buildMultiSelects() {
+  const bar = document.getElementById('filter-bar');
+  const anchor = document.getElementById('f-text').parentElement; // mount before this
+  for (const f of MS_FILTERS) {
+    msState[f.id] = new Set();
+    const values = uniq(DATA.map(f.source));
+    values.sort((a, b) => {
+      if (f.numeric) {
+        const an = +a, bn = +b;
+        if (!isNaN(an) && !isNaN(bn)) return f.desc ? bn - an : an - bn;
+      }
+      return String(a).localeCompare(String(b));
+    });
 
-  fill('f-year', years);
-  fill('f-team', teams);
-  fill('f-round', rounds);
-  fill('f-pos', positions);
-  fill('f-coll', colls);
+    const wrap = document.createElement('label');
+    wrap.textContent = f.label;
+    wrap.style.position = 'relative';
+
+    const ms = document.createElement('div');
+    ms.className = 'ms';
+    ms.dataset.id = f.id;
+
+    const btn = document.createElement('button');
+    btn.className = 'ms-button';
+    btn.type = 'button';
+    btn.textContent = 'All';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.ms.open').forEach(o => { if (o !== ms) o.classList.remove('open'); });
+      ms.classList.toggle('open');
+    });
+
+    const panel = document.createElement('div');
+    panel.className = 'ms-panel';
+
+    const actions = document.createElement('div');
+    actions.className = 'ms-actions';
+    const selAll = document.createElement('button');
+    selAll.textContent = 'Select all';
+    selAll.addEventListener('click', () => { values.forEach(v => msState[f.id].add(String(v))); syncMS(f.id); render(); });
+    const clr = document.createElement('button');
+    clr.textContent = 'Clear';
+    clr.addEventListener('click', () => { msState[f.id].clear(); syncMS(f.id); render(); });
+    actions.appendChild(selAll);
+    actions.appendChild(clr);
+    panel.appendChild(actions);
+
+    for (const v of values) {
+      const opt = document.createElement('label');
+      opt.className = 'ms-option';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = String(v);
+      cb.addEventListener('change', () => {
+        if (cb.checked) msState[f.id].add(String(v));
+        else msState[f.id].delete(String(v));
+        syncMS(f.id);
+        render();
+      });
+      const txt = document.createElement('span');
+      txt.textContent = v;
+      opt.appendChild(cb);
+      opt.appendChild(txt);
+      panel.appendChild(opt);
+    }
+
+    ms.appendChild(btn);
+    ms.appendChild(panel);
+    wrap.appendChild(ms);
+    bar.insertBefore(wrap, anchor);
+  }
+
+  // close panels on outside click
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('.ms.open').forEach(ms => {
+      if (!ms.contains(e.target)) ms.classList.remove('open');
+    });
+  });
 }
 
-function fill(id, values) {
-  const sel = document.getElementById(id);
-  values.forEach(v => {
-    const o = document.createElement('option');
-    o.value = v; o.textContent = v;
-    sel.appendChild(o);
-  });
+function syncMS(id) {
+  const ms = document.querySelector(`.ms[data-id="${id}"]`);
+  if (!ms) return;
+  const btn = ms.querySelector('.ms-button');
+  const sel = msState[id];
+  if (sel.size === 0) { btn.textContent = 'All'; btn.classList.remove('has-selection'); }
+  else if (sel.size <= 2) { btn.textContent = [...sel].join(', '); btn.classList.add('has-selection'); }
+  else { btn.textContent = `${sel.size} selected`; btn.classList.add('has-selection'); }
+  // sync checkboxes
+  ms.querySelectorAll('.ms-option input').forEach(cb => { cb.checked = sel.has(cb.value); });
 }
 
 function applyFilters() {
-  const y = document.getElementById('f-year').value;
-  const t = document.getElementById('f-team').value;
-  const r = document.getElementById('f-round').value;
-  const p = document.getElementById('f-pos').value;
-  const c = document.getElementById('f-coll').value;
   const text = document.getElementById('f-text').value.toLowerCase().trim();
 
   view = DATA.filter(d => {
-    if (y && d.year !== y) return false;
-    if (t && d.teamname !== t) return false;
-    if (r && d.draftRound !== r) return false;
-    if (p && d.posit !== p) return false;
-    if (c && d['College or HS'] !== c) return false;
+    for (const f of MS_FILTERS) {
+      const sel = msState[f.id];
+      if (sel.size > 0) {
+        const v = String(f.source(d));
+        if (!sel.has(v)) return false;
+      }
+    }
     if (text) {
       const hay = (d.fullName + ' ' + (d.colleges3 || '') + ' ' + (d.hsName || '')).toLowerCase();
       if (!hay.includes(text)) return false;
@@ -244,7 +340,6 @@ function render() {
   applyFilters();
   sortView();
 
-  // header arrows
   document.querySelectorAll('thead th').forEach(th => {
     const k = th.dataset.key;
     const base = COLS.find(c => c.key === k).label;
@@ -254,7 +349,6 @@ function render() {
   document.getElementById('row-count').textContent = view.length.toLocaleString();
 
   const tbody = document.querySelector('tbody');
-  // Virtual-ish: cap at 1000 rows rendered for snappiness; show count.
   const CAP = 1500;
   const slice = view.slice(0, CAP);
   const frag = document.createDocumentFragment();
@@ -306,20 +400,19 @@ async function init() {
     r.bonus_num = parseMoney(r.bonus);
     r.slot_num = parseMoney(r.slot_bonus);
     r.diff_num = parseMoney(r.difference);
+    const sp = splitPos(r.posit);
+    r.pos_primary = sp.primary;
+    r.pos_secondary = sp.secondary;
     return r;
   });
 
   buildHeader();
-  buildFilters();
+  buildMultiSelects();
 
-  ['f-year', 'f-team', 'f-round', 'f-pos', 'f-coll'].forEach(id => {
-    document.getElementById(id).addEventListener('change', render);
-  });
   document.getElementById('f-text').addEventListener('input', render);
   document.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const k = chip.dataset.slotFilter;
-      // over and under are mutually exclusive
       if (k === 'over' || k === 'under') {
         const other = k === 'over' ? 'under' : 'over';
         slotFilters.delete(other);
@@ -331,14 +424,13 @@ async function init() {
     });
   });
   document.getElementById('clear').addEventListener('click', () => {
-    ['f-year','f-team','f-round','f-pos','f-coll'].forEach(id => document.getElementById(id).value = '');
+    Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
     document.getElementById('f-text').value = '';
     slotFilters.clear();
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     render();
   });
 
-  // default sort
   sortKey = 'year'; sortDir = -1;
   render();
 }
