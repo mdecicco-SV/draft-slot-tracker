@@ -86,16 +86,34 @@
 
   .meta { padding: 8px 20px; color: var(--muted); font-size: 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; }
   .table-wrap { overflow: auto; max-height: calc(100vh - 280px); -webkit-overflow-scrolling: touch; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead th { position: sticky; top: 0; background: var(--panel); color: var(--text); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  table { border-collapse: separate; border-spacing: 0; font-size: 13px; font-family: inherit; font-weight: 400; font-variant-numeric: tabular-nums; }
+  thead th {
+    position: sticky; top: 0; background: var(--panel); color: var(--text);
+    text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+  }
   thead th:hover { background: var(--panel-2); }
-  thead th .arrow { color: var(--accent); margin-left: 4px; font-size: 11px; }
-  tbody td { padding: 8px 12px; border-bottom: 1px solid #1c2029; white-space: nowrap; }
-  tbody tr:hover { background: #1a1e26; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.diff-pos { color: var(--over); font-weight: 600; }
-  td.diff-neg { color: var(--under); font-weight: 600; }
+  thead th .arrow { color: var(--accent); margin-left: 4px; font-size: 11px; font-weight: 400; }
+  tbody td {
+    padding: 8px 12px; border-bottom: 1px solid #1c2029; white-space: nowrap;
+    background: var(--bg);
+    font-size: 13px; font-weight: 400; font-family: inherit; color: var(--text);
+  }
+  tbody tr:hover td { background: #1a1e26; }
+  td.num { text-align: right; }
+  td.diff-pos { color: var(--over); }
+  td.diff-neg { color: var(--under); }
   td.diff-zero { color: var(--neutral); }
+
+  /* frozen left columns: Year, Rd, Pick, Player */
+  th.frozen, td.frozen { position: sticky; z-index: 1; }
+  thead th.frozen { z-index: 3; }
+  .frozen-1 { left: 0;     min-width: 56px;  width: 56px; }
+  .frozen-2 { left: 56px;  min-width: 40px;  width: 40px; }
+  .frozen-3 { left: 96px;  min-width: 56px;  width: 56px; }
+  .frozen-4 { left: 152px; min-width: 160px; width: 160px; box-shadow: 6px 0 6px -4px rgba(0,0,0,.5); }
+  thead th.frozen-4 { box-shadow: 6px 0 6px -4px rgba(0,0,0,.5); }
   .clear-btn { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   .clear-btn:hover { color: var(--text); border-color: var(--accent); }
   .legend { font-size: 11px; color: var(--muted); }
@@ -123,6 +141,7 @@
     .table-wrap.filters-open { max-height: calc(100vh - 520px); }
     thead th { padding: 8px 10px; font-size: 12px; }
     tbody td { padding: 8px 10px; font-size: 12px; }
+    .frozen-4 { min-width: 140px; width: 140px; }
   }
 </style>
 </head>
@@ -251,10 +270,11 @@ function uniq(arr) { return [...new Set(arr)].filter(x => x != null && x !== '')
 function buildHeader() {
   const tr = document.querySelector('thead tr');
   tr.innerHTML = '';
-  COLS.forEach(c => {
+  COLS.forEach((c, i) => {
     const th = document.createElement('th');
     th.textContent = c.label;
     th.dataset.key = c.key;
+    if (i < 4) th.classList.add('frozen', 'frozen-' + (i + 1));
     th.addEventListener('click', () => {
       if (sortKey === c.key) sortDir = -sortDir;
       else { sortKey = c.key; sortDir = 1; }
@@ -456,13 +476,13 @@ function render() {
   const frag = document.createDocumentFragment();
   for (const d of slice) {
     const tr = document.createElement('tr');
-    for (const c of COLS) {
+    COLS.forEach((c, i) => {
       const td = document.createElement('td');
       let val = d[c.key];
       if (c.fmt === 'money') {
         const n = c.key === 'diff_num' ? d.diff_num : (c.key === 'bonus_num' ? d.bonus_num : d.slot_num);
         td.textContent = n == null ? '' : fmtMoney(n);
-        td.className = 'num';
+        td.classList.add('num');
         if (c.diff && n != null) {
           if (n > 0) td.classList.add('diff-pos');
           else if (n < 0) td.classList.add('diff-neg');
@@ -470,12 +490,13 @@ function render() {
         }
       } else if (c.type === 'num') {
         td.textContent = val == null ? '' : val;
-        td.className = 'num';
+        td.classList.add('num');
       } else {
         td.textContent = val == null ? '' : val;
       }
+      if (i < 4) td.classList.add('frozen', 'frozen-' + (i + 1));
       tr.appendChild(td);
-    }
+    });
     frag.appendChild(tr);
   }
   tbody.innerHTML = '';
