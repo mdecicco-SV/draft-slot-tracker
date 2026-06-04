@@ -315,6 +315,8 @@ const MS_FILTERS = [
   { id: 'pos1',  label: 'Position',         source: d => d.pos_primary },
   { id: 'pos2',  label: 'Secondary Pos',    source: d => d.pos_secondary || '(none)' },
   { id: 'coll',  label: 'College / HS',     source: d => d['College or HS'] },
+  { id: 'bats',  label: 'Bats',             source: d => d.Bats },
+  { id: 'throws',label: 'Throws',           source: d => d.Throws },
 ];
 
 let DATA = [];
