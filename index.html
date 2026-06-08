@@ -148,6 +148,19 @@
   .ms-option:hover { background: var(--bg); }
   .ms-option input { margin: 0; cursor: pointer; accent-color: var(--sv-red); }
 
+  /* range filter (min/max) */
+  .bonus-range-cell { grid-column: span 2; }
+  .range-inputs { display: flex; align-items: center; gap: 6px; }
+  .range-inputs input {
+    width: 100%; min-width: 0; background: var(--bg-card); color: var(--text-primary);
+    border: 1px solid var(--border-default); padding: 10px 12px;
+    border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+    box-shadow: var(--shadow-sm); font-variant-numeric: tabular-nums;
+  }
+  .range-inputs input:focus { outline: none; border-color: var(--sv-red); box-shadow: 0 0 0 3px rgba(255,42,34,.12); }
+  .range-inputs input.has-value { border-color: var(--sv-red); color: var(--sv-red); font-weight: 600; }
+  .range-inputs .range-dash { color: var(--text-tertiary); flex-shrink: 0; }
+
   /* results meta */
   .results-meta {
     padding: 8px 20px 12px; color: var(--text-tertiary); font-size: 12px;
@@ -325,6 +338,8 @@ let sortKey = 'year';
 let sortDir = -1;
 let slotFilters = new Set();
 const msState = {};
+let bonusMin = null;
+let bonusMax = null;
 const CAP = 200; // cards per page
 let renderedCount = CAP;
 
@@ -481,6 +496,57 @@ function buildMultiSelects() {
   });
 }
 
+function buildBonusRange() {
+  const grid = document.getElementById('filters-grid');
+  const wrap = document.createElement('div');
+  wrap.className = 'bonus-range-cell';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'ms-label';
+  lbl.textContent = 'Bonus ($)';
+  wrap.appendChild(lbl);
+
+  const row = document.createElement('div');
+  row.className = 'range-inputs';
+
+  const makeInput = (placeholder, onChange) => {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.inputMode = 'numeric';
+    inp.autocomplete = 'off';
+    inp.placeholder = placeholder;
+    inp.addEventListener('input', () => {
+      const digits = inp.value.replace(/[^\d]/g, '');
+      if (digits === '') {
+        inp.value = '';
+        inp.classList.remove('has-value');
+        onChange(null);
+      } else {
+        const n = parseInt(digits, 10);
+        inp.value = n.toLocaleString('en-US');
+        inp.classList.add('has-value');
+        onChange(n);
+      }
+      render();
+    });
+    return inp;
+  };
+
+  const minInp = makeInput('Min', v => { bonusMin = v; });
+  minInp.id = 'bonus-min';
+  const dash = document.createElement('span');
+  dash.className = 'range-dash';
+  dash.textContent = '–';
+  const maxInp = makeInput('Max', v => { bonusMax = v; });
+  maxInp.id = 'bonus-max';
+
+  row.appendChild(minInp);
+  row.appendChild(dash);
+  row.appendChild(maxInp);
+  wrap.appendChild(row);
+  grid.appendChild(wrap);
+}
+
 function syncMS(id) {
   const ms = document.querySelector(`.ms[data-id="${id}"]`);
   if (!ms) return;
@@ -509,6 +575,11 @@ function applyFilters() {
     if (slotFilters.has('over') && !(d.diff_num > 0)) return false;
     if (slotFilters.has('under') && !(d.diff_num < 0)) return false;
     if (slotFilters.has('signed') && d.bonus_num == null) return false;
+    if (bonusMin != null || bonusMax != null) {
+      if (d.bonus_num == null) return false;
+      if (bonusMin != null && d.bonus_num < bonusMin) return false;
+      if (bonusMax != null && d.bonus_num > bonusMax) return false;
+    }
     return true;
   });
 }
@@ -710,6 +781,7 @@ async function init() {
 
   buildHeader();
   buildMultiSelects();
+  buildBonusRange();
 
   const searchEl = document.getElementById('f-search');
   searchEl.addEventListener('input', () => { renderSuggestions(); render(); });
@@ -749,6 +821,8 @@ async function init() {
 
   document.getElementById('clear').addEventListener('click', () => {
     Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
+    bonusMin = null; bonusMax = null;
+    ['bonus-min', 'bonus-max'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.classList.remove('has-value'); });
     document.getElementById('f-search').value = '';
     slotFilters.clear();
     document.querySelectorAll('.pill[data-slot-filter]').forEach(p => p.classList.remove('active'));
