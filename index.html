@@ -878,15 +878,21 @@ function renderSuggestions() {
   box.classList.add('open');
 }
 
+// Plain ASCII hyphen (not the display minus sign) so Excel still reads these as currency values
+function csvMoney(n) {
+  if (n == null || isNaN(n)) return '';
+  return (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString('en-US');
+}
+
 function exportCSV() {
   const cols = [
     ['Year',       d => d.year],
     ['Round',      d => d.draftRound],
     ['Pick',       d => d.overall],
     ['Player',     d => d.fullName],
-    ['Bonus',      d => d.bonus_num],
-    ['Slot',       d => d.slot_num],
-    ['Diff',       d => d.diff_num],
+    ['Bonus',      d => csvMoney(d.bonus_num)],
+    ['Slot',       d => csvMoney(d.slot_num)],
+    ['Diff',       d => csvMoney(d.diff_num)],
     ['Age',        d => d.age_num == null ? '' : d.age_num.toFixed(1)],
     ['Pos',        d => d.pos_primary],
     ['Pos2',       d => d.pos_secondary],
