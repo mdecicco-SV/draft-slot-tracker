@@ -890,6 +890,10 @@ async function init() {
     const sp = splitPos(r.posit);
     r.pos_primary = sp.primary;
     r.pos_secondary = sp.secondary;
+    // Split generic 'P' into RHP/LHP by throwing hand ('S' = switch-pitcher stays 'P')
+    const hand = r.Throws === 'R' ? 'RHP' : r.Throws === 'L' ? 'LHP' : 'P';
+    if (r.pos_primary === 'P') r.pos_primary = hand;
+    if (r.pos_secondary === 'P') r.pos_secondary = hand;
     r.age_num = ageAtDraft(r.borndate, +r.year);
     r.conference = conferenceFor(r);
     return r;
