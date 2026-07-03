@@ -314,10 +314,12 @@ const COLS = [
   { key: 'bonus_num',    label: 'Bonus',  type: 'num', fmt: 'money' },
   { key: 'slot_num',     label: 'Slot',   type: 'num', fmt: 'money' },
   { key: 'diff_num',     label: 'Diff',   type: 'num', fmt: 'money', diff: true },
+  { key: 'age_num',      label: 'Age',    type: 'num', fmt: 'age' },
   { key: 'pos_primary',  label: 'Pos',    type: 'str' },
   { key: 'pos_secondary',label: 'Pos 2',  type: 'str' },
   { key: 'teamname',     label: 'Team',   type: 'str' },
   { key: 'College or HS',label: 'C/HS',   type: 'str' },
+  { key: 'conference',   label: 'Conf',   type: 'str' },
   { key: 'colleges3',    label: 'School', type: 'str' },
 ];
 
@@ -328,6 +330,7 @@ const MS_FILTERS = [
   { id: 'pos1',  label: 'Position',         source: d => d.pos_primary },
   { id: 'pos2',  label: 'Secondary Pos',    source: d => d.pos_secondary || '(none)' },
   { id: 'coll',  label: 'College / HS',     source: d => d['College or HS'] },
+  { id: 'conf',  label: 'Conference',       source: d => d.conference || '(other)' },
   { id: 'bats',  label: 'Bats',             source: d => d.Bats },
   { id: 'throws',label: 'Throws',           source: d => d.Throws },
 ];
@@ -340,6 +343,8 @@ let slotFilters = new Set();
 const msState = {};
 let bonusMin = null;
 let bonusMax = null;
+let ageMin = null;
+let ageMax = null;
 const CAP = 200; // cards per page
 let renderedCount = CAP;
 
@@ -390,6 +395,58 @@ function fmtMoneyShort(n) {
   if (a >= 1_000_000) return sign + '$' + (a / 1_000_000).toFixed(a >= 10_000_000 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
   if (a >= 1_000) return sign + '$' + Math.round(a / 1_000) + 'K';
   return sign + '$' + a;
+}
+
+// Day 1 of each draft (draft moved from early June to mid-July starting in 2021)
+const DRAFT_DATES = {
+  2018: '2018-06-04', 2019: '2019-06-03', 2020: '2020-06-10', 2021: '2021-07-11',
+  2022: '2022-07-17', 2023: '2023-07-09', 2024: '2024-07-14', 2025: '2025-07-13',
+};
+
+function ageAtDraft(borndate, year) {
+  if (!borndate || !DRAFT_DATES[year]) return null;
+  const m = String(borndate).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const born = Date.UTC(+m[3], +m[1] - 1, +m[2]);
+  const draft = Date.parse(DRAFT_DATES[year] + 'T00:00:00Z');
+  const age = (draft - born) / (365.25 * 24 * 3600 * 1000);
+  return age > 0 && age < 60 ? Math.round(age * 10) / 10 : null;
+}
+
+// Power-conference membership by draft year (i.e. the season the player was drafted out of).
+// Realignment: Texas/Oklahoma are Big 12 through the 2024 draft, SEC from 2025; Pac-12 exodus hits the 2025 draft.
+const CONF_ALIASES = {
+  'U Alabama': 'Alabama', 'U Arizona': 'Arizona', 'U Georgia': 'Georgia', 'U Houston': 'Houston',
+  'U Mississippi': 'Mississippi', 'Ole Miss': 'Mississippi', 'Texas Christian': 'TCU',
+};
+const SCHOOL_CONF = (() => {
+  const m = {};
+  const add = (conf, names, from = 2018, to = 2025) => names.forEach(n => (m[n] = m[n] || []).push([from, to, conf]));
+  add('SEC', ['Alabama','Arkansas','Auburn','Florida','Georgia','Kentucky','LSU','Mississippi','Mississippi State','Missouri','South Carolina','Tennessee','Texas A&M','Vanderbilt']);
+  add('SEC', ['Texas','Oklahoma'], 2025);
+  add('Big 12', ['Texas','Oklahoma'], 2018, 2024);
+  add('Big 12', ['Baylor','Kansas','Kansas State','Oklahoma State','TCU','Texas Tech','West Virginia']);
+  add('Big 12', ['BYU','Cincinnati','Houston','Central Florida'], 2024);
+  add('Big 12', ['Arizona','Arizona State','Utah'], 2025);
+  add('ACC', ['Boston College','Clemson','Duke','Florida State','Georgia Tech','Louisville','Miami','North Carolina','NC State','Notre Dame','Pittsburgh','Virginia','Virginia Tech','Wake Forest']);
+  add('ACC', ['Stanford','California','SMU'], 2025);
+  add('Big Ten', ['Illinois','Indiana','Iowa','Maryland','Michigan','Michigan State','Minnesota','Nebraska','Northwestern','Ohio State','Penn State','Purdue','Rutgers']);
+  add('Big Ten', ['UCLA','USC','Oregon','Washington'], 2025);
+  add('Pac-12', ['Arizona','Arizona State','California','Oregon','Oregon State','Stanford','UCLA','USC','Utah','Washington','Washington State'], 2018, 2024);
+  add('Pac-12', ['Oregon State','Washington State'], 2025);
+  return m;
+})();
+
+function conferenceFor(d) {
+  if (d['College or HS'] !== 'C') return '';
+  const parts = (d.colleges3 || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  const school = CONF_ALIASES[parts[parts.length - 1]] || parts[parts.length - 1];
+  const spans = SCHOOL_CONF[school];
+  if (!spans) return '';
+  const y = +d.year;
+  for (const [from, to, conf] of spans) if (y >= from && y <= to) return conf;
+  return '';
 }
 
 function splitPos(raw) {
@@ -547,6 +604,53 @@ function buildBonusRange() {
   grid.appendChild(wrap);
 }
 
+function buildAgeRange() {
+  const grid = document.getElementById('filters-grid');
+  const wrap = document.createElement('div');
+
+  const lbl = document.createElement('span');
+  lbl.className = 'ms-label';
+  lbl.textContent = 'Age at draft';
+  wrap.appendChild(lbl);
+
+  const row = document.createElement('div');
+  row.className = 'range-inputs';
+
+  const makeInput = (placeholder, onChange) => {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.inputMode = 'decimal';
+    inp.autocomplete = 'off';
+    inp.placeholder = placeholder;
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      if (isNaN(v)) {
+        inp.classList.remove('has-value');
+        onChange(null);
+      } else {
+        inp.classList.add('has-value');
+        onChange(v);
+      }
+      render();
+    });
+    return inp;
+  };
+
+  const minInp = makeInput('Min', v => { ageMin = v; });
+  minInp.id = 'age-min';
+  const dash = document.createElement('span');
+  dash.className = 'range-dash';
+  dash.textContent = '–';
+  const maxInp = makeInput('Max', v => { ageMax = v; });
+  maxInp.id = 'age-max';
+
+  row.appendChild(minInp);
+  row.appendChild(dash);
+  row.appendChild(maxInp);
+  wrap.appendChild(row);
+  grid.appendChild(wrap);
+}
+
 function syncMS(id) {
   const ms = document.querySelector(`.ms[data-id="${id}"]`);
   if (!ms) return;
@@ -579,6 +683,11 @@ function applyFilters() {
       if (d.bonus_num == null) return false;
       if (bonusMin != null && d.bonus_num < bonusMin) return false;
       if (bonusMax != null && d.bonus_num > bonusMax) return false;
+    }
+    if (ageMin != null || ageMax != null) {
+      if (d.age_num == null) return false;
+      if (ageMin != null && d.age_num < ageMin) return false;
+      if (ageMax != null && d.age_num > ageMax) return false;
     }
     return true;
   });
@@ -626,6 +735,8 @@ function renderCards(rows) {
           <span class="sep">·</span>
           <span>${escapeHtml(d.year)} · R${escapeHtml(d.draftRound)} · #${escapeHtml(d.overall)}</span>
           <span class="sep">·</span>
+          <span>${d.age_num == null ? '—' : d.age_num.toFixed(1) + ' yrs'}</span>
+          <span class="sep">·</span>
           <span>${escapeHtml(d.colleges3 || d.hsName || '—')}</span>
         </div>
         <div class="nums">
@@ -666,6 +777,9 @@ function renderTable(rows) {
           else if (n < 0) td.classList.add('diff-neg');
           else td.classList.add('diff-zero');
         }
+      } else if (c.fmt === 'age') {
+        td.textContent = d.age_num == null ? '' : d.age_num.toFixed(1);
+        td.classList.add('num');
       } else if (c.type === 'num') {
         td.textContent = val == null ? '' : val;
         td.classList.add('num');
@@ -776,12 +890,15 @@ async function init() {
     const sp = splitPos(r.posit);
     r.pos_primary = sp.primary;
     r.pos_secondary = sp.secondary;
+    r.age_num = ageAtDraft(r.borndate, +r.year);
+    r.conference = conferenceFor(r);
     return r;
   });
 
   buildHeader();
   buildMultiSelects();
   buildBonusRange();
+  buildAgeRange();
 
   const searchEl = document.getElementById('f-search');
   searchEl.addEventListener('input', () => { renderSuggestions(); render(); });
@@ -821,8 +938,8 @@ async function init() {
 
   document.getElementById('clear').addEventListener('click', () => {
     Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
-    bonusMin = null; bonusMax = null;
-    ['bonus-min', 'bonus-max'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.classList.remove('has-value'); });
+    bonusMin = null; bonusMax = null; ageMin = null; ageMax = null;
+    ['bonus-min', 'bonus-max', 'age-min', 'age-max'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.classList.remove('has-value'); });
     document.getElementById('f-search').value = '';
     slotFilters.clear();
     document.querySelectorAll('.pill[data-slot-filter]').forEach(p => p.classList.remove('active'));
