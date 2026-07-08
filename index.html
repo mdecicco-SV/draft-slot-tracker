@@ -329,7 +329,6 @@ const COLS = [
 const MS_FILTERS = [
   { id: 'year',  label: 'Year',  source: d => d.year,          numeric: true,  desc: true },
   { id: 'team',  label: 'Team',  source: d => d.teamname,      numeric: false },
-  { id: 'round', label: 'Round', source: d => d.draftRound,    numeric: true },
   { id: 'pos1',  label: 'Position',         source: d => d.pos_primary },
   { id: 'pos2',  label: 'Secondary Pos',    source: d => d.pos_secondary || '(none)' },
   { id: 'coll',  label: 'College / HS',     source: d => d['College or HS'] },
@@ -348,6 +347,8 @@ let bonusMin = null;
 let bonusMax = null;
 let ageMin = null;
 let ageMax = null;
+let roundMin = null;
+let roundMax = null;
 const CAP = 200; // cards per page
 let renderedCount = CAP;
 
@@ -654,6 +655,54 @@ function buildAgeRange() {
   grid.appendChild(wrap);
 }
 
+function buildRoundRange() {
+  const grid = document.getElementById('filters-grid');
+  const wrap = document.createElement('div');
+
+  const lbl = document.createElement('span');
+  lbl.className = 'ms-label';
+  lbl.textContent = 'Round';
+  wrap.appendChild(lbl);
+
+  const row = document.createElement('div');
+  row.className = 'range-inputs';
+
+  const makeInput = (placeholder, onChange) => {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.inputMode = 'numeric';
+    inp.autocomplete = 'off';
+    inp.placeholder = placeholder;
+    inp.addEventListener('input', () => {
+      const digits = inp.value.replace(/[^\d]/g, '');
+      inp.value = digits;
+      if (digits === '') {
+        inp.classList.remove('has-value');
+        onChange(null);
+      } else {
+        inp.classList.add('has-value');
+        onChange(parseInt(digits, 10));
+      }
+      render();
+    });
+    return inp;
+  };
+
+  const minInp = makeInput('Min', v => { roundMin = v; });
+  minInp.id = 'round-min';
+  const dash = document.createElement('span');
+  dash.className = 'range-dash';
+  dash.textContent = '–';
+  const maxInp = makeInput('Max', v => { roundMax = v; });
+  maxInp.id = 'round-max';
+
+  row.appendChild(minInp);
+  row.appendChild(dash);
+  row.appendChild(maxInp);
+  wrap.appendChild(row);
+  grid.appendChild(wrap);
+}
+
 function syncMS(id) {
   const ms = document.querySelector(`.ms[data-id="${id}"]`);
   if (!ms) return;
@@ -691,6 +740,12 @@ function applyFilters() {
       if (d.age_num == null) return false;
       if (ageMin != null && d.age_num < ageMin) return false;
       if (ageMax != null && d.age_num > ageMax) return false;
+    }
+    if (roundMin != null || roundMax != null) {
+      const rd = +d.draftRound;
+      if (isNaN(rd)) return false;
+      if (roundMin != null && rd < roundMin) return false;
+      if (roundMax != null && rd > roundMax) return false;
     }
     return true;
   });
@@ -947,6 +1002,7 @@ async function init() {
 
   buildHeader();
   buildMultiSelects();
+  buildRoundRange();
   buildBonusRange();
   buildAgeRange();
 
@@ -990,8 +1046,8 @@ async function init() {
 
   document.getElementById('clear').addEventListener('click', () => {
     Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
-    bonusMin = null; bonusMax = null; ageMin = null; ageMax = null;
-    ['bonus-min', 'bonus-max', 'age-min', 'age-max'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.classList.remove('has-value'); });
+    bonusMin = null; bonusMax = null; ageMin = null; ageMax = null; roundMin = null; roundMax = null;
+    ['bonus-min', 'bonus-max', 'age-min', 'age-max', 'round-min', 'round-max'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.classList.remove('has-value'); });
     document.getElementById('f-search').value = '';
     slotFilters.clear();
     document.querySelectorAll('.pill[data-slot-filter]').forEach(p => p.classList.remove('active'));
