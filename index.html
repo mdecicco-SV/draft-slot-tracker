@@ -233,6 +233,38 @@
   /* show more */
   .show-more { padding: 12px 20px 24px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
 
+  /* team drill-down modal */
+  td.team-link, td.pct-link, .pick-card .team-tag, .pick-card .num-cell.pct-cell { cursor: pointer; }
+  td.team-link:hover, td.pct-link:hover { color: var(--sv-red); text-decoration: underline dotted; text-underline-offset: 3px; }
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(13,13,13,.45); padding: 16px; overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+  .team-modal {
+    background: var(--bg-card); border-radius: var(--radius); width: 100%; max-width: 780px;
+    margin: 4vh 0 40px; box-shadow: 0 10px 40px rgba(15,23,42,.25); overflow: hidden;
+  }
+  .tm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border-default); }
+  .tm-head h2 { margin: 0; font-size: 18px; font-weight: 900; letter-spacing: -0.01em; }
+  .tm-head .tm-sub { color: var(--text-tertiary); font-size: 12.5px; margin-top: 3px; }
+  .tm-close { background: transparent; border: none; font-size: 22px; line-height: 1; color: var(--text-tertiary); cursor: pointer; padding: 2px 6px; font-family: inherit; }
+  .tm-close:hover { color: var(--sv-red); }
+  .tm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; padding: 14px 20px 0; }
+  .tm-stat { background: var(--bg); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .tm-stat .label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .tm-stat .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tm-section { padding: 14px 20px 0; }
+  .tm-section .tm-label { font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; }
+  .tm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tm-chip { background: var(--bg); border: 1px solid var(--border-default); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; color: var(--text-secondary); }
+  .tm-chip b { color: var(--text-primary); }
+  .tm-table { padding: 16px 20px 20px; overflow-x: auto; }
+  .tm-table table { font-size: 13px; }
+  .tm-table thead th { position: static; cursor: default; }
+  .tm-table thead th:hover { background: var(--bg-lane); color: var(--text-secondary); }
+  .tm-table th.num { text-align: right; }
+
   /* desktop layout */
   @media (min-width: 900px) {
     .topbar { padding: 14px 28px; }
@@ -307,6 +339,10 @@
 </div>
 
 <div class="show-more" id="show-more"></div>
+
+<div class="modal-overlay" id="team-modal-overlay">
+  <div class="team-modal" id="team-modal"></div>
+</div>
 
 <script>
 const COLS = [
@@ -816,13 +852,16 @@ function renderCards(rows) {
             <div class="label">${dc === 'over' ? 'Over' : dc === 'under' ? 'Under' : 'Diff'}</div>
             <div class="val">${fmtMoneyShort(d.diff_num)}</div>
           </div>
-          <div class="num-cell">
+          <div class="num-cell pct-cell">
             <div class="label">% Pool</div>
             <div class="val">${fmtPct(d.pct_pool)}</div>
           </div>
         </div>
       </div>
     `;
+    const open = () => openTeamModal(d.year, d.teamname);
+    card.querySelector('.team-tag').addEventListener('click', open);
+    card.querySelector('.pct-cell').addEventListener('click', open);
     frag.appendChild(card);
   }
   list.appendChild(frag);
@@ -847,7 +886,9 @@ function renderTable(rows) {
         }
       } else if (c.fmt === 'pct') {
         td.textContent = d.pct_pool == null ? '' : fmtPct(d.pct_pool);
-        td.classList.add('num');
+        td.classList.add('num', 'pct-link');
+        td.title = `${d.teamname} ${d.year} pool: ${fmtMoneyFull(d.pool_num)} — click for draft class`;
+        td.addEventListener('click', () => openTeamModal(d.year, d.teamname));
       } else if (c.fmt === 'age') {
         td.textContent = d.age_num == null ? '' : d.age_num.toFixed(1);
         td.classList.add('num');
@@ -856,6 +897,11 @@ function renderTable(rows) {
         td.classList.add('num');
       } else {
         td.textContent = val == null ? '' : val;
+        if (c.key === 'teamname' && val) {
+          td.classList.add('team-link');
+          td.title = `Click for ${d.year} draft class`;
+          td.addEventListener('click', () => openTeamModal(d.year, d.teamname));
+        }
       }
       if (c.cls) td.classList.add(c.cls);
       tr.appendChild(td);
@@ -864,6 +910,84 @@ function renderTable(rows) {
   }
   tbody.innerHTML = '';
   tbody.appendChild(frag);
+}
+
+function openTeamModal(year, team) {
+  const picks = DATA.filter(d => d.year === year && d.teamname === team)
+    .sort((a, b) => +a.overall - +b.overall);
+  if (!picks.length) return;
+  const pool = picks[0].pool_num;
+  const spent = picks.reduce((s, d) => s + (d.bonus_num || 0), 0);
+  const signed = picks.filter(d => d.bonus_num != null).length;
+  // Pool charge: R1-10 bonuses count in full; R11+ only the amount above
+  // that year's threshold ($125K through 2022, $150K from 2023 on)
+  const thr = +year >= 2023 ? 150000 : 125000;
+  const charge = picks.reduce((s, d) => {
+    if (d.bonus_num == null) return s;
+    return s + (+d.draftRound <= 10 ? d.bonus_num : Math.max(0, d.bonus_num - thr));
+  }, 0);
+
+  const posCounts = {};
+  for (const d of picks) { const p = d.pos_primary || '—'; posCounts[p] = (posCounts[p] || 0) + 1; }
+  const posChips = Object.entries(posCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([p, n]) => `<span class="tm-chip"><b>${escapeHtml(p)}</b> × ${n}</span>`).join('');
+
+  const nHS = picks.filter(d => d['College or HS'] === 'HS').length;
+  const nC = picks.length - nHS;
+
+  const rows = picks.map(d => `
+    <tr>
+      <td class="num">${escapeHtml(d.draftRound)}</td>
+      <td class="num">${escapeHtml(d.overall)}</td>
+      <td class="player">${escapeHtml(d.fullName)}</td>
+      <td>${escapeHtml(d.pos_primary || '')}${d.pos_secondary ? ' / ' + escapeHtml(d.pos_secondary) : ''}</td>
+      <td>${escapeHtml(d['College or HS'] || '')}</td>
+      <td>${escapeHtml(d.colleges3 || d.hsName || '')}</td>
+      <td class="num">${d.bonus_num == null ? '—' : fmtMoneyFull(d.bonus_num)}</td>
+      <td class="num">${fmtPct(d.pct_pool)}</td>
+    </tr>`).join('');
+
+  const modal = document.getElementById('team-modal');
+  modal.innerHTML = `
+    <div class="tm-head">
+      <div>
+        <h2>${escapeHtml(team)}</h2>
+        <div class="tm-sub">${escapeHtml(year)} draft class · ${picks.length} picks</div>
+      </div>
+      <button class="tm-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="tm-stats">
+      <div class="tm-stat"><div class="label">Bonus pool</div><div class="val">${fmtMoneyShort(pool)}</div></div>
+      <div class="tm-stat"><div class="label">Bonuses paid</div><div class="val">${fmtMoneyShort(spent)}</div></div>
+      <div class="tm-stat" title="R1-10 bonuses in full plus R11+ overage above the threshold, vs the pool"><div class="label">Pool used</div><div class="val">${pool ? fmtPct(charge / pool * 100) : '—'}</div></div>
+      <div class="tm-stat"><div class="label">Signed</div><div class="val">${signed} / ${picks.length}</div></div>
+    </div>
+    <div class="tm-section">
+      <div class="tm-label">By position</div>
+      <div class="tm-chips">${posChips}</div>
+    </div>
+    <div class="tm-section">
+      <div class="tm-label">College vs High School</div>
+      <div class="tm-chips">
+        <span class="tm-chip"><b>College</b> × ${nC}</span>
+        <span class="tm-chip"><b>HS</b> × ${nHS}</span>
+      </div>
+    </div>
+    <div class="tm-table">
+      <table>
+        <thead><tr><th class="num">Rd</th><th class="num">Pick</th><th>Player</th><th>Pos</th><th>C/HS</th><th>School</th><th class="num">Bonus</th><th class="num">% Pool</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  modal.querySelector('.tm-close').addEventListener('click', closeTeamModal);
+  document.getElementById('team-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTeamModal() {
+  document.getElementById('team-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function render() {
@@ -1072,6 +1196,10 @@ async function init() {
   });
 
   document.getElementById('export-csv').addEventListener('click', exportCSV);
+
+  const tmOverlay = document.getElementById('team-modal-overlay');
+  tmOverlay.addEventListener('click', (e) => { if (e.target === tmOverlay) closeTeamModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTeamModal(); });
 
   document.getElementById('clear').addEventListener('click', () => {
     Object.keys(msState).forEach(id => { msState[id].clear(); syncMS(id); });
