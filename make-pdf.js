@@ -76,6 +76,8 @@ const title = titleArg || 'MLB Draft Picks';
 const subtitle = rows.length + ' picks · ' + yearSpan + ' MLB Draft' + (years.length > 1 ? 's' : '');
 const generated = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+const hasPct = '% of Pool' in rows[0];
+
 const body = rows.map(r => {
   const bonus = parseMoney(r.Bonus), slot = parseMoney(r.Slot), diff = parseMoney(r.Diff);
   const cls = diff > 0 ? 'pos' : diff < 0 ? 'neg' : 'zero';
@@ -84,6 +86,7 @@ const body = rows.map(r => {
     '</td><td class=player>' + esc(r.Player) + '</td><td class=num>' + age +
     '</td><td class=num>' + fmtMoney(bonus) + '</td><td class=num>' + fmtMoney(slot) +
     '</td><td class="num ' + cls + '">' + fmtMoney(diff) +
+    (hasPct ? '</td><td class=num>' + esc(r['% of Pool'] || '—') : '') +
     '</td><td>' + esc(finalSchool(r.School)) + '</td><td>' + esc(r.Team) + '</td></tr>';
 }).join('\n');
 
@@ -105,9 +108,13 @@ const html = '<!doctype html><html><head><meta charset=utf-8><style>' +
   '</style></head><body>' +
   '<div class=head><span class=dot></span><h1>' + esc(title) + '</h1></div>' +
   '<div class=sub>' + esc(subtitle) + '</div>' +
-  '<table><thead><tr><th class=num>Year</th><th class=num>Rd</th><th class=num>Pick</th><th>Player</th><th class=num>Age</th><th class=num>Bonus</th><th class=num>Slot</th><th class=num>Diff</th><th>School</th><th>Team</th></tr></thead><tbody>' +
+  '<table><thead><tr><th class=num>Year</th><th class=num>Rd</th><th class=num>Pick</th><th>Player</th><th class=num>Age</th><th class=num>Bonus</th><th class=num>Slot</th><th class=num>Diff</th>' +
+  (hasPct ? '<th class=num>% Pool</th>' : '') +
+  '<th>School</th><th>Team</th></tr></thead><tbody>' +
   body + '</tbody></table>' +
-  '<div class=foot><span>Age = age on day 1 of that year\'s draft. Diff = bonus minus slot value.</span><span>Generated ' + generated + '</span></div>' +
+  '<div class=foot><span>Age = age on day 1 of that year\'s draft. Diff = bonus minus slot value.' +
+  (hasPct ? ' % Pool = bonus as a share of the team\'s total bonus pool that year.' : '') +
+  '</span><span>Generated ' + generated + '</span></div>' +
   '</body></html>';
 
 const outPdf = outArg || csvPath.replace(/\.csv$/i, '') + '.pdf';

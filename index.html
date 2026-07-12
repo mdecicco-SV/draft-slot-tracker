@@ -186,8 +186,8 @@
   .pick-card .meta { color: var(--text-secondary); font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 10px; }
   .pick-card .meta .sep { color: var(--border-default); }
   .pick-card .meta .pos { color: var(--text-primary); font-weight: 600; }
-  .pick-card .nums { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
-  .pick-card .num-cell { background: var(--bg); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .pick-card .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .pick-card .num-cell { background: var(--bg); border-radius: var(--radius-sm); padding: 8px 9px; min-width: 0; }
   .pick-card .num-cell .label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
   .pick-card .num-cell .val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -0.01em; }
   .pick-card .num-cell.diff-over { background: var(--over-bg); border: 1px solid var(--over-border); }
@@ -261,7 +261,7 @@
 
 <div class="hero">
   <h1>Over and under slot, by pick</h1>
-  <p>R1-10 slots from MLB Stats API; R11+ uses each year's bonus-pool threshold ($125K through 2022, $150K from 2023 on).</p>
+  <p>R1-10 slots from MLB Stats API; R11+ uses each year's bonus-pool threshold ($125K through 2022, $150K from 2023 on). % Pool = bonus as a share of the team's total pool that year (sum of its R1-10 slots).</p>
   <div class="search-wrap">
     <input id="f-search" class="search-input" type="search" autocomplete="off"
            placeholder="Search a player or school" />
@@ -317,6 +317,7 @@ const COLS = [
   { key: 'bonus_num',    label: 'Bonus',  type: 'num', fmt: 'money' },
   { key: 'slot_num',     label: 'Slot',   type: 'num', fmt: 'money' },
   { key: 'diff_num',     label: 'Diff',   type: 'num', fmt: 'money', diff: true },
+  { key: 'pct_pool',     label: '% Pool', type: 'num', fmt: 'pct' },
   { key: 'age_num',      label: 'Age',    type: 'num', fmt: 'age' },
   { key: 'pos_primary',  label: 'Pos',    type: 'str' },
   { key: 'pos_secondary',label: 'Pos 2',  type: 'str' },
@@ -390,6 +391,11 @@ function fmtMoneyFull(n) {
   if (n == null || isNaN(n)) return '—';
   const sign = n < 0 ? '−' : '';
   return sign + '$' + Math.abs(n).toLocaleString('en-US');
+}
+
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '—';
+  return n.toFixed(1) + '%';
 }
 
 function fmtMoneyShort(n) {
@@ -810,6 +816,10 @@ function renderCards(rows) {
             <div class="label">${dc === 'over' ? 'Over' : dc === 'under' ? 'Under' : 'Diff'}</div>
             <div class="val">${fmtMoneyShort(d.diff_num)}</div>
           </div>
+          <div class="num-cell">
+            <div class="label">% Pool</div>
+            <div class="val">${fmtPct(d.pct_pool)}</div>
+          </div>
         </div>
       </div>
     `;
@@ -835,6 +845,9 @@ function renderTable(rows) {
           else if (n < 0) td.classList.add('diff-neg');
           else td.classList.add('diff-zero');
         }
+      } else if (c.fmt === 'pct') {
+        td.textContent = d.pct_pool == null ? '' : fmtPct(d.pct_pool);
+        td.classList.add('num');
       } else if (c.fmt === 'age') {
         td.textContent = d.age_num == null ? '' : d.age_num.toFixed(1);
         td.classList.add('num');
@@ -948,6 +961,8 @@ function exportCSV() {
     ['Bonus',      d => csvMoney(d.bonus_num)],
     ['Slot',       d => csvMoney(d.slot_num)],
     ['Diff',       d => csvMoney(d.diff_num)],
+    ['% of Pool',  d => d.pct_pool == null ? '' : d.pct_pool.toFixed(1) + '%'],
+    ['Team Pool',  d => csvMoney(d.pool_num)],
     ['Age',        d => d.age_num == null ? '' : d.age_num.toFixed(1)],
     ['Pos',        d => d.pos_primary],
     ['Pos2',       d => d.pos_secondary],
@@ -999,6 +1014,20 @@ async function init() {
     r.conference = conferenceFor(r);
     return r;
   });
+
+  // Team bonus pool = sum of that team's R1-10 slot values for the year
+  // (matches MLB's published pools; verified against 2024-25 figures)
+  const pools = {};
+  for (const r of DATA) {
+    if (+r.draftRound <= 10 && r.slot_num != null) {
+      const k = r.year + '|' + r.teamname;
+      pools[k] = (pools[k] || 0) + r.slot_num;
+    }
+  }
+  for (const r of DATA) {
+    r.pool_num = pools[r.year + '|' + r.teamname] || null;
+    r.pct_pool = r.bonus_num != null && r.pool_num ? r.bonus_num / r.pool_num * 100 : null;
+  }
 
   buildHeader();
   buildMultiSelects();
