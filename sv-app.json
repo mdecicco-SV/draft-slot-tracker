@@ -1,0 +1,49 @@
+{
+  "slug": "draft-slot-tracker",
+  "name": "Draft Slot Tracker",
+  "category": "Analytics",
+  "status": "active",
+  "description": "Searchable web tracker of every MLB draft signing 2018-2025 (~4,900 picks): bonus vs slot value, over/under-slot diff, share of team bonus pool, with filters for year, round range, position (RHP/LHP split), college vs HS, power conference, age at draft, and bonus range. Exports the filtered view to CSV; a companion Node script turns that export into a styled one-page PDF report.",
+  "url": "https://stadium-ventures.github.io/draft-slot-tracker/",
+  "repo": "Stadium-Ventures/draft-slot-tracker",
+  "owner": "Mike DeCicco",
+  "builder": "Mike DeCicco",
+  "maintainer": "Mike DeCicco",
+  "stack": [
+    "Static HTML/CSS/JS (single index.html, no framework, no build step)",
+    "GitHub Pages",
+    "Node + headless Chrome (make-pdf.js, local PDF reports)"
+  ],
+  "hosting": "GitHub Pages, deployed automatically from main of Stadium-Ventures/draft-slot-tracker",
+  "access": "Public URL, no auth — repo and site are public. On-page brand reads \"SV Draft Slots\".",
+  "pipes": {
+    "inputs": [
+      "data.csv committed in the repo — a static snapshot of MLB draft signings 2018-2025 (~4,900 rows: pick, player, bonus, slot value, position, bats/throws, school/conference, birthdate). No live feed; the page fetches this file client-side."
+    ],
+    "outputs": [
+      "CSV download of the current filtered view (Export CSV button on the site)",
+      "One-page PDF reports generated locally: node make-pdf.js <export.csv> [title] (renders via headless Google Chrome)"
+    ]
+  },
+  "links": [
+    {
+      "label": "Live site",
+      "url": "https://stadium-ventures.github.io/draft-slot-tracker/",
+      "note": "MLB Draft Slot Tracker (2018-2025). Search a player or filter, then Export CSV for report material."
+    }
+  ],
+  "crons": [],
+  "monitoring": "None needed — static GitHub Pages site with no scheduled jobs. Only failure mode is a Pages build failure on push, visible in the repo's Actions tab (\"pages build and deployment\").",
+  "knownIssues": [
+    "Data is a frozen snapshot through the 2025 draft — 2026 signings are not in it; adding them means updating data.csv by hand (👤 Mike DeCicco)"
+  ],
+  "notes": "Repo was transferred from mdecicco-SV/draft-slot-tracker to the Stadium-Ventures org; the old name is now a GitHub redirect, so either remote URL works but Stadium-Ventures/draft-slot-tracker is canonical. Open question: the original source/export behind data.csv (columns suggest an MLB draft database export) is not documented in-repo, so refreshing the data requires re-deriving that pull.",
+  "runbook": [
+    "Clone Stadium-Ventures/draft-slot-tracker — no dependencies, no env vars, no secrets.",
+    "Run locally: python3 -m http.server 8000 in the repo root, then open http://localhost:8000 (index.html fetches data.csv, so opening the file directly via file:// will not load data).",
+    "Update data: edit data.csv (header row defines the schema: phase,year,draftRound,overall,...,bonus,slot_bonus,difference), commit, push to main.",
+    "Deploy: push to main — GitHub Pages rebuilds automatically in ~1 minute (watch the \"pages build and deployment\" run in the repo's Actions tab).",
+    "PDF report: use the site's Export CSV button, then node make-pdf.js <export.csv> [title] [output.pdf] — requires Google Chrome at the default macOS path, or set CHROME=/path/to/chrome.",
+    "First troubleshooting step if the site looks stale or broken: check the latest \"pages build and deployment\" run under the repo's Actions tab."
+  ]
+}
