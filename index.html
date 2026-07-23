@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>MLB Draft Slot Tracker (2018-2025)</title>
+<title>MLB Draft Slot Tracker (2018-2026)</title>
 <link rel="preconnect" href="https://api.fontshare.com" />
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" />
 <style>
@@ -256,7 +256,7 @@
 <body>
 
 <div class="topbar">
-  <div class="brand"><span class="dot"></span>SV Draft Slots <span class="sub">2018–2025</span></div>
+  <div class="brand"><span class="dot"></span>SV Draft Slots <span class="sub">2018–2026</span></div>
 </div>
 
 <div class="hero">
@@ -325,6 +325,7 @@ const COLS = [
   { key: 'College or HS',label: 'C/HS',   type: 'str' },
   { key: 'conference',   label: 'Conf',   type: 'str' },
   { key: 'colleges3',    label: 'School', type: 'str' },
+  { key: 'agency',       label: 'Agency', type: 'str' },
 ];
 
 const MS_FILTERS = [
@@ -336,6 +337,7 @@ const MS_FILTERS = [
   { id: 'conf',  label: 'Conference',       source: d => d.conference || '(other)' },
   { id: 'bats',  label: 'Bats',             source: d => d.Bats },
   { id: 'throws',label: 'Throws',           source: d => d.Throws },
+  { id: 'agency',label: 'Agency',           source: d => d.agency || '(unknown)' },
 ];
 
 let DATA = [];
@@ -411,6 +413,7 @@ function fmtMoneyShort(n) {
 const DRAFT_DATES = {
   2018: '2018-06-04', 2019: '2019-06-03', 2020: '2020-06-10', 2021: '2021-07-11',
   2022: '2022-07-17', 2023: '2023-07-09', 2024: '2024-07-14', 2025: '2025-07-13',
+  2026: '2026-07-11',
 };
 
 function ageAtDraft(borndate, year) {
@@ -431,7 +434,7 @@ const CONF_ALIASES = {
 };
 const SCHOOL_CONF = (() => {
   const m = {};
-  const add = (conf, names, from = 2018, to = 2025) => names.forEach(n => (m[n] = m[n] || []).push([from, to, conf]));
+  const add = (conf, names, from = 2018, to = 2026) => names.forEach(n => (m[n] = m[n] || []).push([from, to, conf]));
   add('SEC', ['Alabama','Arkansas','Auburn','Florida','Georgia','Kentucky','LSU','Mississippi','Mississippi State','Missouri','South Carolina','Tennessee','Texas A&M','Vanderbilt']);
   add('SEC', ['Texas','Oklahoma'], 2025);
   add('Big 12', ['Texas','Oklahoma'], 2018, 2024);
@@ -802,6 +805,7 @@ function renderCards(rows) {
           <span>${d.age_num == null ? '—' : d.age_num.toFixed(1) + ' yrs'}</span>
           <span class="sep">·</span>
           <span>${escapeHtml(d.colleges3 || d.hsName || '—')}</span>
+          ${d.agency ? `<span class="sep">·</span><span>${escapeHtml(d.agency)}</span>` : ''}
         </div>
         <div class="nums">
           <div class="num-cell">
@@ -974,6 +978,7 @@ function exportCSV() {
     ['School',     d => d.colleges3],
     ['HS',         d => d.hsName],
     ['Birthdate',  d => d.borndate],
+    ['Agency',     d => d.agency],
   ];
   const esc = v => {
     v = v == null ? '' : String(v);
